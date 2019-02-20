@@ -23,12 +23,16 @@ summary(train_demo)
 summary(train_perf)
 
 # 1. EDA -------------------------------------------------------------------------------------------
+# Data types
+# Look at missing values
+# Outliers?
 
+# Visualise some characteristics
 # Target variable - classification
 train_perf %>%
   group_by(good_bad_flag) %>%
   summarise(count = n()) %>%
-  ggplot(aes(x=good_bad_flag, y=count)) +
+  ggplot(aes(x = good_bad_flag, y = count)) +
   geom_col() +
   theme(legend.position = "none") +
   ggtitle("Distribution of classification")
@@ -38,9 +42,8 @@ ggplot(train_perf, aes(loanamount)) +
   geom_histogram() +
   ggtitle("Distribution of loan amount")
 
-
 # 2. CLEAN, PRE-PROCESS AND PREPARE ----------------------------------------------------------------
-# Combine data sets
+# Combine loan performance and demographics data sets
 train_perf <- train_perf %>%
   left_join(train_demo, by = "customerid")
 
@@ -48,7 +51,7 @@ test_perf <- test_perf %>%
   left_join(train_demo, by = "customerid")
 
 # Missing values
-# replace missing categorical variables with another level ("not_available") and convert to factors
+# Replace missing categorical variables with another level ("not_available") and convert to factors
 train_perf <- train_perf %>%
   mutate_if(is.character, replace_na, replace = "not_available") %>%
   mutate_if(is.character, as.factor) %>%
@@ -59,7 +62,7 @@ test_perf <- test_perf %>%
   mutate_if(is.character, as.factor) %>%
   mutate(customerid = as.character(customerid))
 
-# Create target variable
+# Create target variable and format variable to align with submission file
 train_perf <- train_perf %>%
   mutate(Good_Bad_flag = ifelse(good_bad_flag == "Good", 1, 0)) %>%
   select(-good_bad_flag)
@@ -67,9 +70,9 @@ train_perf <- train_perf %>%
 # 3. FEATURE ENGINEERING ---------------------------------------------------------------------------
 # Eg:
 # - Age of customer at time of loan application
-# - Number of previous loans and time period
 # - Use GPS to get location - classify as urban or rural?
 # - Was customer referred or not?
+# - Use previous loan information, ie. How many previous loans granted? Time period? Was first payment made on time?
 
 train_perf <- train_perf %>%
   # Referred or not?
@@ -97,13 +100,12 @@ model <- glm(Good_Bad_flag ~ loannumber + loanamount + totaldue + termdays + ban
 summary(model)
 
 # 6. EVALUATE ---------------------------------------------------------------------------------------
-
 importance <- data.frame(varImp(model, scale = TRUE))
 importance
 
-prediction <- predict(model, newdata = testing, type = "response")
-accuracy <- table(prediction, testing[, "Good_Bad_flag"])
-confusionMatrix(data = table(prediction, testing$Good_Bad_flag))
+# prediction <- predict(model, newdata = testing, type = "response")
+# accuracy <- table(prediction, testing[, "Good_Bad_flag"])
+# confusionMatrix(data = table(prediction, testing$Good_Bad_flag))
 
 prob <- predict(model, newdata = testing)
 pred <- prediction(prob, testing$Good_Bad_flag)
@@ -117,6 +119,7 @@ auc
 # Run model on final test data
 final_prediction <- predict(model, test_perf)
 
+# Setting arbritary threshold for now
 Good_Bad_flag <- ifelse(final_prediction >= 0.6, 1, 0)
 
 # 8. PREPARE SUBMISSION FILE -----------------------------------------------------------------------
